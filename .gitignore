@@ -1,0 +1,50 @@
+# Pastas geradas pelo Unity
+Library/
+Temp/
+Obj/
+obj/
+Build/
+Builds/
+Logs/
+UserSettings/
+MemoryCaptures/
+Recordings/
+
+# Cache de importadores e do Burst
+[Aa]ssets/[Aa]ssetStoreTools*
+[Aa]ssets/Plugins/Editor/JetBrains*
+.consulo/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Rider / Visual Studio
+.idea/
+.vs/
+.vsconfig
+
+# Builds de plataforma
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Crash reports
+sysinfo.txt
+crashlytics-build.properties
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
