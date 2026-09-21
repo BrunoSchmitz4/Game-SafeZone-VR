@@ -1,84 +1,111 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 namespace SafeZoneVR
 {
-    /// <summary>
-    /// One socket that must receive a specific objective item (matched via <see cref="ObjectiveItemId"/>)
-    /// for the group to count as filled. Leave <see cref="requiredItemId"/> empty to accept any item.
-    /// </summary>
-    [Serializable]
-    public struct SocketRequirement
-    {
-        public XRSocketInteractor socket;
-        public string requiredItemId;
-    }
-
-    /// <summary>
-    /// Completes a mission step once every socket in the group has received its required item
-    /// (RF05 — validating interactions with environment objects). Used for grouped placements
-    /// such as "move the valuables to the high shelf" or "pack the emergency kit".
-    /// </summary>
-    public class StepCompleteOnSocket : MonoBehaviour
+    public class StepCompleteOnSocket : StepValidatorBase
     {
         [SerializeField]
-        ScenarioManager m_ScenarioManager;
+        List<XRSocketInteractor> m_Sockets = new List<XRSocketInteractor>();
 
         [SerializeField]
-        MissionStepSO m_Step;
+        [Tooltip("IDs de item exigidos. Se vazio, basta preencher todos os sockets com qualquer item identificado.")]
+        List<string> m_RequiredItemIds = new List<string>();
 
-        [SerializeField]
-        SocketRequirement[] m_Requirements = Array.Empty<SocketRequirement>();
+        readonly Dictionary<XRSocketInteractor, string> m_Placed = new Dictionary<XRSocketInteractor, string>();
 
-        readonly HashSet<int> m_Filled = new HashSet<int>();
-        UnityAction<SelectEnterEventArgs>[] m_Handlers;
+        public List<XRSocketInteractor> sockets => m_Sockets;
+        public List<string> requiredItemIds => m_RequiredItemIds;
 
-        void Awake()
+        public int requiredCount => m_RequiredItemIds.Count > 0 ? m_RequiredItemIds.Count : m_Sockets.Count;
+
+        public int placedCount
         {
-            m_Handlers = new UnityAction<SelectEnterEventArgs>[m_Requirements.Length];
-            for (var i = 0; i < m_Requirements.Length; i++)
+            get
             {
-                var index = i;
-                m_Handlers[i] = args => OnSocketFilled(index, args);
+                if (m_RequiredItemIds.Count == 0)
+                    return m_Placed.Count;
+
+                var count = 0;
+                for (var i = 0; i < m_RequiredItemIds.Count; i++)
+                {
+                    if (m_Placed.ContainsValue(m_RequiredItemIds[i]))
+                        count++;
+                }
+                return count;
             }
         }
 
         void OnEnable()
         {
-            for (var i = 0; i < m_Requirements.Length; i++)
+            for (var i = 0; i < m_Sockets.Count; i++)
             {
-                if (m_Requirements[i].socket != null)
-                    m_Requirements[i].socket.selectEntered.AddListener(m_Handlers[i]);
+                var s = m_Sockets[i];
+                if (s == null) continue;
+                s.selectEntered.AddListener(OnSocketSelectEntered);
+                s.selectExited.AddListener(OnSocketSelectExited);
             }
         }
 
         void OnDisable()
         {
-            for (var i = 0; i < m_Requirements.Length; i++)
+            for (var i = 0; i < m_Sockets.Count; i++)
             {
-                if (m_Requirements[i].socket != null)
-                    m_Requirements[i].socket.selectEntered.RemoveListener(m_Handlers[i]);
+                var s = m_Sockets[i];
+                if (s == null) continue;
+                s.selectEntered.RemoveListener(OnSocketSelectEntered);
+                s.selectExited.RemoveListener(OnSocketSelectExited);
             }
         }
 
-        void OnSocketFilled(int index, SelectEnterEventArgs args)
+        void OnSocketSelectEntered(SelectEnterEventArgs args)
         {
-            var requiredId = m_Requirements[index].requiredItemId;
-            if (!string.IsNullOrEmpty(requiredId))
-            {
-                var item = args.interactableObject.transform.GetComponent<ObjectiveItemId>();
-                if (item == null || item.itemId != requiredId)
-                    return;
-            }
+            if (m_Completed)
+                return;
 
-            m_Filled.Add(index);
+            var socket = args.interactorObject as XRSocketInteractor;
+            var itemTransform = args.interactableObject.transform;
+            var item = itemTransform != null ? itemTransform.GetComponent<ObjectiveItemId>() : null;
+            if (socket == null || item == null)
+                return;
 
-            if (m_ScenarioManager != null && m_Filled.Count >= m_Requirements.Length)
-                m_ScenarioManager.CompleteStep(m_Step);
+            if (m_RequiredItemIds.Count > 0 && !m_RequiredItemIds.Contains(item.itemId))
+                return;
+
+            m_Placed[socket] = item.itemId;
+
+            var target = itemTransform.GetComponent<ObjectiveTarget>();
+            if (target != null)
+                target.SetSatisfied(true);
+
+            var placed = placedCount;
+            var required = requiredCount;
+            ReportProgress(placed, required);
+
+            if (placed >= required)
+                Complete();
+        }
+
+        void OnSocketSelectExited(SelectExitEventArgs args)
+        {
+            if (m_Completed)
+                return;
+
+            var socket = args.interactorObject as XRSocketInteractor;
+            if (socket == null || !m_Placed.Remove(socket))
+                return;
+
+            if (args.isCanceled || !isActiveAndEnabled)
+                return;
+
+            var itemTransform = args.interactableObject.transform;
+            var target = itemTransform != null ? itemTransform.GetComponent<ObjectiveTarget>() : null;
+            if (target != null)
+                target.SetSatisfied(false);
+
+            ReportProgress(placedCount, requiredCount);
         }
     }
 }

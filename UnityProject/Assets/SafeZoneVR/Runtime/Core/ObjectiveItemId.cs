@@ -2,17 +2,24 @@ using UnityEngine;
 
 namespace SafeZoneVR
 {
-    /// <summary>
-    /// Marker placed on a grabbable/socketable object so validators can identify which
-    /// objective item was placed or picked up.
-    /// </summary>
     public class ObjectiveItemId : MonoBehaviour
     {
         [SerializeField]
-        string m_ItemId;
+        string m_ItemId = "item_001";
 
-        public string itemId => m_ItemId;
+        [SerializeField]
+        string m_DisplayName = "";
 
-        public void SetItemId(string id) => m_ItemId = id;
+        public string itemId
+        {
+            get => m_ItemId;
+            set => m_ItemId = value;
+        }
+
+        public string displayName
+        {
+            get => string.IsNullOrEmpty(m_DisplayName) ? m_ItemId : m_DisplayName;
+            set => m_DisplayName = value;
+        }
     }
 }

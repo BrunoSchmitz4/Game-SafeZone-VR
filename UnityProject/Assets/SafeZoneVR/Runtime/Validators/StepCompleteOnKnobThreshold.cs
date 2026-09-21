@@ -1,47 +1,55 @@
-using Unity.VRTemplate;
 using UnityEngine;
 
 namespace SafeZoneVR
 {
-    /// <summary>
-    /// Completes a mission step once an <see cref="XRKnob"/> (breaker switch, water valve, etc.)
-    /// reaches a target value, e.g. fully closed/off (RF05).
-    /// </summary>
-    public class StepCompleteOnKnobThreshold : MonoBehaviour
+    public class StepCompleteOnKnobThreshold : StepValidatorBase
     {
         [SerializeField]
-        ScenarioManager m_ScenarioManager;
+        Transform m_TargetTransform;
 
         [SerializeField]
-        MissionStepSO m_Step;
+        float m_ThresholdAngle = 90f;
 
         [SerializeField]
-        XRKnob m_Knob;
+        [Tooltip("Intervalo (s) entre verificações; evita custo por frame.")]
+        float m_CheckInterval = 0.1f;
 
-        [SerializeField]
-        [Range(0f, 1f)]
-        float m_TargetValue;
+        Quaternion m_StartRotation;
+        float m_NextCheck;
 
-        [SerializeField]
-        [Range(0f, 0.5f)]
-        float m_Tolerance = 0.05f;
-
-        void OnEnable()
+        public Transform targetTransform
         {
-            if (m_Knob != null)
-                m_Knob.onValueChange.AddListener(OnValueChanged);
+            get => m_TargetTransform;
+            set => m_TargetTransform = value;
         }
 
-        void OnDisable()
+        public float thresholdAngle
         {
-            if (m_Knob != null)
-                m_Knob.onValueChange.RemoveListener(OnValueChanged);
+            get => m_ThresholdAngle;
+            set => m_ThresholdAngle = value;
         }
 
-        void OnValueChanged(float value)
+        void Start()
         {
-            if (m_ScenarioManager != null && Mathf.Abs(value - m_TargetValue) <= m_Tolerance)
-                m_ScenarioManager.CompleteStep(m_Step);
+            if (m_TargetTransform == null)
+            {
+                Debug.LogWarning($"StepCompleteOnKnobThreshold em '{name}' sem Target Transform; validador desativado.", this);
+                enabled = false;
+                return;
+            }
+
+            m_StartRotation = m_TargetTransform.localRotation;
+        }
+
+        void Update()
+        {
+            if (m_Completed || Time.time < m_NextCheck)
+                return;
+            m_NextCheck = Time.time + m_CheckInterval;
+
+            var angle = Quaternion.Angle(m_StartRotation, m_TargetTransform.localRotation);
+            if (angle >= m_ThresholdAngle)
+                Complete();
         }
     }
 }

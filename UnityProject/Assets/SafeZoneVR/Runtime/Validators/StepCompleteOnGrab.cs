@@ -1,43 +1,53 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 namespace SafeZoneVR
 {
-    /// <summary>
-    /// Completes a mission step the first time this object is grabbed (RF05). Useful for
-    /// single-item pickups that don't require placing the item anywhere specific.
-    /// </summary>
-    [RequireComponent(typeof(XRGrabInteractable))]
-    public class StepCompleteOnGrab : MonoBehaviour
+    public class StepCompleteOnGrab : StepValidatorBase
     {
         [SerializeField]
-        ScenarioManager m_ScenarioManager;
+        [Tooltip("Interagível a ser pego. Se vazio, usa o do próprio objeto.")]
+        XRBaseInteractable m_Interactable;
 
-        [SerializeField]
-        MissionStepSO m_Step;
-
-        XRGrabInteractable m_Interactable;
-
-        void Awake()
+        public XRBaseInteractable interactable
         {
-            m_Interactable = GetComponent<XRGrabInteractable>();
+            get => m_Interactable;
+            set => m_Interactable = value;
+        }
+
+        protected override void Awake()
+        {
+            base.Awake();
+            if (m_Interactable == null)
+                m_Interactable = GetComponent<XRBaseInteractable>();
         }
 
         void OnEnable()
         {
-            m_Interactable.selectEntered.AddListener(OnGrabbed);
+            if (m_Interactable != null)
+                m_Interactable.selectEntered.AddListener(OnSelectEntered);
         }
 
         void OnDisable()
         {
-            m_Interactable.selectEntered.RemoveListener(OnGrabbed);
+            if (m_Interactable != null)
+                m_Interactable.selectEntered.RemoveListener(OnSelectEntered);
         }
 
-        void OnGrabbed(SelectEnterEventArgs args)
+        void OnSelectEntered(SelectEnterEventArgs args)
         {
-            if (m_ScenarioManager != null)
-                m_ScenarioManager.CompleteStep(m_Step);
+            if (m_Completed)
+                return;
+            if (args.interactorObject is XRSocketInteractor)
+                return;
+            Complete();
+        }
+
+        public void OnGrabbed()
+        {
+            Complete();
         }
     }
 }
